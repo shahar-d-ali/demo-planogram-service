@@ -45,4 +45,7 @@ public class Product {
 	@Column(name = "active", nullable = false)
 	private Boolean active;
 
+	public Product(Long id) {
+		this.id = id;
+	}
 }

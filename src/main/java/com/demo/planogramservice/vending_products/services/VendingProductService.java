@@ -1,5 +1,6 @@
 package com.demo.planogramservice.vending_products.services;
 
+import com.demo.planogramservice.products.domain.Product;
 import com.demo.planogramservice.vending_products.domain.VendingProduct;
 import com.demo.planogramservice.vending_products.domain.VendingProductRepository;
 import com.demo.planogramservice.vending_products.dto.VendingProductRequestDto;
@@ -29,20 +30,21 @@ public class VendingProductService {
 
 	public List<VendingProductResponseDto> getVendingProductsByVendingMachineId(Long vendingMachineId) {
 		return vendingProductRepository.findByVendingMachineId(vendingMachineId)
-			.stream()
-			.map(this::toResponseDto)
-			.toList();
+				.stream()
+				.map(this::toResponseDto)
+				.toList();
 	}
 
 	public VendingProductResponseDto createVendingProduct(VendingProductRequestDto requestDto) {
 		VendingProduct vendingProduct = VendingProduct.builder()
-			.vendingMachineId(requestDto.getVendingMachineId())
-			.slotNumber(requestDto.getSlotNumber())
-			.capacity(requestDto.getCapacity())
-			.quantity(requestDto.getQuantity())
-			.price(requestDto.getPrice())
-			.active(requestDto.getActive())
-			.build();
+				.vendingMachineId(requestDto.getVendingMachineId())
+				.slotNumber(requestDto.getSlotNumber())
+				.capacity(requestDto.getCapacity())
+				.quantity(requestDto.getQuantity())
+				.price(requestDto.getPrice())
+				.active(requestDto.getActive())
+				.product(new Product(requestDto.getProductId()))
+				.build();
 
 		return toResponseDto(vendingProductRepository.save(vendingProduct));
 	}
@@ -56,7 +58,7 @@ public class VendingProductService {
 		vendingProduct.setQuantity(requestDto.getQuantity());
 		vendingProduct.setPrice(requestDto.getPrice());
 		vendingProduct.setActive(requestDto.getActive());
-
+		vendingProduct.setProduct(new Product(requestDto.getProductId()));
 		return toResponseDto(vendingProductRepository.save(vendingProduct));
 	}
 
@@ -67,18 +69,19 @@ public class VendingProductService {
 
 	private VendingProduct findByIdOrThrow(Long id) {
 		return vendingProductRepository.findById(id)
-			.orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Vending product not found"));
+				.orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Vending product not found"));
 	}
 
 	private VendingProductResponseDto toResponseDto(VendingProduct vendingProduct) {
 		return VendingProductResponseDto.builder()
-			.id(vendingProduct.getId())
-			.vendingMachineId(vendingProduct.getVendingMachineId())
-			.slotNumber(vendingProduct.getSlotNumber())
-			.capacity(vendingProduct.getCapacity())
-			.quantity(vendingProduct.getQuantity())
-			.price(vendingProduct.getPrice())
-			.active(vendingProduct.getActive())
-			.build();
+				.id(vendingProduct.getId())
+				.vendingMachineId(vendingProduct.getVendingMachineId())
+				.slotNumber(vendingProduct.getSlotNumber())
+				.capacity(vendingProduct.getCapacity())
+				.quantity(vendingProduct.getQuantity())
+				.price(vendingProduct.getPrice())
+				.productId(vendingProduct.getProduct().getId())
+				.active(vendingProduct.getActive())
+				.build();
 	}
 }
