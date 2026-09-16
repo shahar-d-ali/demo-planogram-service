@@ -20,36 +20,41 @@ import java.util.Map;
 @Configuration
 public class KafkaConsumerConfig {
 
-    @Value("${spring.kafka.bootstrap-servers:localhost:9092}")
-    private String bootstrapServers;
+    // @Value("${spring.kafka.bootstrap-servers:localhost:9092}")
+    // private String bootstrapServers;
 
-    @Value("${spring.kafka.consumer.group-id:planogram-service-group}")
-    private String groupId;
+    // @Value("${spring.kafka.consumer.group-id:planogram-service-group}")
+    // private String groupId;
 
-    @Bean
-    public ConsumerFactory<String, PingEvent> consumerFactory() {
-        JsonDeserializer<PingEvent> jsonDeserializer = new JsonDeserializer<>(PingEvent.class);
-        jsonDeserializer.addTrustedPackages("*");
-        jsonDeserializer.setUseTypeHeaders(false);
+    // @Bean
+    // public ConsumerFactory<String, PingEvent> consumerFactory() {
+    // JsonDeserializer<PingEvent> jsonDeserializer = new
+    // JsonDeserializer<>(PingEvent.class);
+    // jsonDeserializer.addTrustedPackages("*");
+    // jsonDeserializer.setUseTypeHeaders(false);
 
-        ErrorHandlingDeserializer<PingEvent> errorHandlingDeserializer =
-                new ErrorHandlingDeserializer<>(jsonDeserializer);
+    // ErrorHandlingDeserializer<PingEvent> errorHandlingDeserializer =
+    // new ErrorHandlingDeserializer<>(jsonDeserializer);
 
-        Map<String, Object> props = new HashMap<>();
-        props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
-        props.put(ConsumerConfig.GROUP_ID_CONFIG, groupId);
-        props.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
-        props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, ErrorHandlingDeserializer.class);
+    // Map<String, Object> props = new HashMap<>();
+    // props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
+    // props.put(ConsumerConfig.GROUP_ID_CONFIG, groupId);
+    // props.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG,
+    // StringDeserializer.class);
+    // props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG,
+    // ErrorHandlingDeserializer.class);
 
-        return new DefaultKafkaConsumerFactory<>(props, new StringDeserializer(), errorHandlingDeserializer);
-    }
+    // return new DefaultKafkaConsumerFactory<>(props, new StringDeserializer(),
+    // errorHandlingDeserializer);
+    // }
 
-    @Bean
-    public ConcurrentKafkaListenerContainerFactory<String, PingEvent> kafkaListenerContainerFactory(
-            ConsumerFactory<String, PingEvent> consumerFactory) {
-        ConcurrentKafkaListenerContainerFactory<String, PingEvent> factory =
-                new ConcurrentKafkaListenerContainerFactory<>();
-        factory.setConsumerFactory(consumerFactory);
-        return factory;
-    }
+    // @Bean
+    // public ConcurrentKafkaListenerContainerFactory<String, PingEvent>
+    // kafkaListenerContainerFactory(
+    // ConsumerFactory<String, PingEvent> consumerFactory) {
+    // ConcurrentKafkaListenerContainerFactory<String, PingEvent> factory =
+    // new ConcurrentKafkaListenerContainerFactory<>();
+    // factory.setConsumerFactory(consumerFactory);
+    // return factory;
+    // }
 }

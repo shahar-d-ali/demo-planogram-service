@@ -1,0 +1,11 @@
+{
+  "type": "record",
+  "name": "PingEvent",
+  "namespace": "com.demo.events.avro",
+  "fields": [
+    { "name": "id", "type": "string" },
+    { "name": "message", "type": "string" },
+    { "name": "sourceService", "type": "string" },
+    { "name": "timestamp", "type": { "type": "long", "logicalType": "timestamp-millis" } }
+  ]
+}
