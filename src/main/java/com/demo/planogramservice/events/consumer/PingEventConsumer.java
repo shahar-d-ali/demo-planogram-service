@@ -1,6 +1,6 @@
 package com.demo.planogramservice.events.consumer;
 
-import com.demo.planogramservice.events.dto.PingEvent;
+import com.demo.events.avro.PingEvent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.kafka.annotation.KafkaListener;
