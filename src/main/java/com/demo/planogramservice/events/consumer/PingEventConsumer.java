@@ -1,12 +1,13 @@
 package com.demo.planogramservice.events.consumer;
 
-import com.demo.events.avro.PingEvent;
+import java.util.concurrent.atomic.AtomicReference;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Service;
 
-import java.util.concurrent.atomic.AtomicReference;
+import com.demo.shared.events.dto.PingEvent;
 
 @Service
 public class PingEventConsumer {

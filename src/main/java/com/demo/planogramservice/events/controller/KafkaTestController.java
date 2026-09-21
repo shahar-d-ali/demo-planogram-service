@@ -1,13 +1,14 @@
 package com.demo.planogramservice.events.controller;
 
-import com.demo.planogramservice.events.consumer.PingEventConsumer;
-import com.demo.events.avro.PingEvent;
+import java.util.Map;
+
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.Map;
+import com.demo.planogramservice.events.consumer.PingEventConsumer;
+import com.demo.shared.events.dto.PingEvent;
 
 @RestController
 @RequestMapping("/kafka")
@@ -25,6 +26,11 @@ public class KafkaTestController {
         if (lastPing == null) {
             return ResponseEntity.ok(Map.of("message", "No ping received yet"));
         }
-        return ResponseEntity.ok(lastPing);
+
+        return ResponseEntity.ok(Map.of(
+                "id", lastPing.getId().toString(),
+                "message", lastPing.getMessage().toString(),
+                "sourceService", lastPing.getSourceService().toString(),
+                "timestamp", lastPing.getTimestamp()));
     }
 }
