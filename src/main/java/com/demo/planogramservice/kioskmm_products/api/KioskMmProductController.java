@@ -14,6 +14,9 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import io.swagger.v3.oas.annotations.tags.Tag;
+
+@Tag(name = "Kiosk Products", description = "Micro-Market Kiosk Product Slot APIs")
 @RestController
 @RequestMapping("/kiosk-mm-products")
 public class KioskMmProductController {

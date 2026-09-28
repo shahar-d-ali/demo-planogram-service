@@ -2,10 +2,7 @@ package com.demo.planogramservice.events.consumer;
 
 import java.time.Instant;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
-import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
@@ -22,98 +19,34 @@ import com.demo.planogramservice.events.domain.KafkaEventLogsRepository;
 import com.demo.shared.events.dto.PingEvent;
 
 /**
- * Consumer Group: planogram-service-group (Load Balancing / Competing Consumers Pattern)
+ * Consumer Group 2: audit-service-group
  * 
- * Demonstrates MULTIPLE CONSUMERS INSIDE A SINGLE CONSUMER GROUP:
- * 
- * All workers share the same 'groupId' ("planogram-service-group").
- * In Apache Kafka, when multiple consumers share the same groupId:
- * 1. They DO NOT duplicate messages. Instead, they divide the topic's partitions among themselves.
- * 2. Topic 'demo-ping-topic' has 5 partitions (0, 1, 2, 3, 4).
- * 3. Kafka assigns a subset of partitions to Worker-1, Worker-2, and Worker-3.
- * 4. Each published event is processed by EXACTLY ONE worker inside this group (load-balanced).
+ * Demonstrates the Fan-Out (Publish-Subscribe) pattern in Apache Kafka.
+ * Both 'planogram-service-group' and 'audit-service-group' subscribe to the
+ * same topic 'demo-ping-topic', and each group independently receives 100%
+ * of all messages published to the topic, tracking its own offset.
  */
 @Service
-public class PingEventConsumer {
+public class AuditPingEventConsumer {
 
-    private static final Logger log = LoggerFactory.getLogger(PingEventConsumer.class);
-    public static final String GROUP_ID = "planogram-service-group";
+    private static final Logger log = LoggerFactory.getLogger(AuditPingEventConsumer.class);
+    public static final String GROUP_ID = "audit-service-group";
 
     private final KafkaEventLogsRepository kafkaEventLogsRepository;
 
-    public PingEventConsumer(KafkaEventLogsRepository kafkaEventLogsRepository) {
+    public AuditPingEventConsumer(KafkaEventLogsRepository kafkaEventLogsRepository) {
         this.kafkaEventLogsRepository = kafkaEventLogsRepository;
     }
 
     private final AtomicReference<PingEvent> lastReceivedPing = new AtomicReference<>();
     private final AtomicReference<Map<String, Object>> lastPingMap = new AtomicReference<>();
-
-    // Group-level counters
     private final AtomicInteger totalConsumed = new AtomicInteger(0);
     private final AtomicInteger lastPartition = new AtomicInteger(-1);
     private final AtomicLong lastOffset = new AtomicLong(-1);
     private final AtomicReference<String> lastReceivedAt = new AtomicReference<>();
-    private final AtomicReference<String> lastWorker = new AtomicReference<>("None");
 
-    // Per-worker counters
-    private final AtomicInteger worker1Count = new AtomicInteger(0);
-    private final AtomicInteger worker2Count = new AtomicInteger(0);
-    private final AtomicInteger worker3Count = new AtomicInteger(0);
-
-    // Track which partitions each worker has processed
-    private final Set<Integer> worker1Partitions = ConcurrentHashMap.newKeySet();
-    private final Set<Integer> worker2Partitions = ConcurrentHashMap.newKeySet();
-    private final Set<Integer> worker3Partitions = ConcurrentHashMap.newKeySet();
-
-    /**
-     * Consumer Instance 1 (Worker 1 in planogram-service-group)
-     */
-    @KafkaListener(
-        id = "planogram-consumer-worker-1",
-        topics = "demo-ping-topic",
-        groupId = GROUP_ID,
-        clientIdPrefix = "planogram-worker-1"
-    )
-    public void consumeWorker1(ConsumerRecord<String, Object> record, Acknowledgment acknowledgment) {
-        worker1Count.incrementAndGet();
-        worker1Partitions.add(record.partition());
-        processRecord("Worker-1", record, acknowledgment);
-    }
-
-    /**
-     * Consumer Instance 2 (Worker 2 in planogram-service-group)
-     */
-    @KafkaListener(
-        id = "planogram-consumer-worker-2",
-        topics = "demo-ping-topic",
-        groupId = GROUP_ID,
-        clientIdPrefix = "planogram-worker-2"
-    )
-    public void consumeWorker2(ConsumerRecord<String, Object> record, Acknowledgment acknowledgment) {
-        worker2Count.incrementAndGet();
-        worker2Partitions.add(record.partition());
-        processRecord("Worker-2", record, acknowledgment);
-    }
-
-    /**
-     * Consumer Instance 3 (Worker 3 in planogram-service-group)
-     */
-    @KafkaListener(
-        id = "planogram-consumer-worker-3",
-        topics = "demo-ping-topic",
-        groupId = GROUP_ID,
-        clientIdPrefix = "planogram-worker-3"
-    )
-    public void consumeWorker3(ConsumerRecord<String, Object> record, Acknowledgment acknowledgment) {
-        worker3Count.incrementAndGet();
-        worker3Partitions.add(record.partition());
-        processRecord("Worker-3", record, acknowledgment);
-    }
-
-    /**
-     * Common processing logic for all workers in this consumer group
-     */
-    private void processRecord(String workerName, ConsumerRecord<String, Object> record, Acknowledgment acknowledgment) {
+    @KafkaListener(topics = "demo-ping-topic", groupId = GROUP_ID)
+    public void consume(ConsumerRecord<String, Object> record, Acknowledgment acknowledgment) {
         Object value = record.value();
         int partition = record.partition();
         long offset = record.offset();
@@ -122,11 +55,10 @@ public class PingEventConsumer {
         lastPartition.set(partition);
         lastOffset.set(offset);
         lastReceivedAt.set(Instant.now().toString());
-        lastWorker.set(workerName);
-        int total = totalConsumed.incrementAndGet();
+        int count = totalConsumed.incrementAndGet();
 
-        log.info("[PLANOGRAM-GROUP] [{}] Received record #{} (key={}) -> [partition={}, offset={}, thread={}]",
-                workerName, total, key, partition, offset, Thread.currentThread().getName());
+        log.info("[AUDIT-GROUP] Captured audit record #{} from topic demo-ping-topic [partition={}, offset={}, key={}]",
+                count, partition, offset, key);
 
         String eventId = null;
         String message = null;
@@ -146,17 +78,15 @@ public class PingEventConsumer {
             details.put("sourceService", sourceService);
             details.put("timestamp", payloadTimestamp);
             details.put("groupId", GROUP_ID);
-            details.put("worker", workerName);
             details.put("partition", partition);
             details.put("offset", offset);
-            details.put("thread", Thread.currentThread().getName());
+            details.put("auditTimestamp", Instant.now().toEpochMilli());
             lastPingMap.set(details);
 
             if (acknowledgment != null) {
                 acknowledgment.acknowledge();
             }
         } else if (value != null) {
-            // Safe extraction if value was loaded by a different ClassLoader
             try {
                 eventId = String.valueOf(value.getClass().getMethod("getId").invoke(value));
                 message = String.valueOf(value.getClass().getMethod("getMessage").invoke(value));
@@ -170,32 +100,28 @@ public class PingEventConsumer {
                 details.put("sourceService", sourceService);
                 details.put("timestamp", payloadTimestamp);
                 details.put("groupId", GROUP_ID);
-                details.put("worker", workerName);
                 details.put("partition", partition);
                 details.put("offset", offset);
-                details.put("thread", Thread.currentThread().getName());
+                details.put("auditTimestamp", Instant.now().toEpochMilli());
                 lastPingMap.set(details);
 
                 if (acknowledgment != null) {
                     acknowledgment.acknowledge();
                 }
             } catch (Exception e) {
-                log.warn("[PLANOGRAM-GROUP] [{}] Could not extract ping event fields via reflection: {}", workerName, e.getMessage());
+                log.warn("[AUDIT-GROUP] Could not extract ping event fields via reflection: {}", e.getMessage());
             }
         }
 
-        saveLog(workerName, record, eventId, message, sourceService, payloadTimestamp, "ACKNOWLEDGED", null);
+        saveLog(record, eventId, message, sourceService, payloadTimestamp);
     }
 
     private void saveLog(
-            String workerName,
             ConsumerRecord<String, Object> record,
             String eventId,
             String message,
             String sourceService,
-            Long payloadTimestamp,
-            String status,
-            String errorMessage) {
+            Long payloadTimestamp) {
         if (kafkaEventLogsRepository == null) return;
         try {
             KafkaEventLogs logEntry = KafkaEventLogs.builder()
@@ -207,20 +133,19 @@ public class PingEventConsumer {
                     .timestampType(record.timestampType() != null ? record.timestampType().name() : null)
                     .leaderEpoch(record.leaderEpoch() != null && record.leaderEpoch().isPresent() ? record.leaderEpoch().get() : null)
                     .consumerGroupId(GROUP_ID)
-                    .workerName(workerName)
-                    .consumerClientId("planogram-" + workerName.toLowerCase())
+                    .workerName("AuditWorker")
+                    .consumerClientId("audit-consumer-1")
                     .threadName(Thread.currentThread().getName())
                     .eventId(eventId)
                     .sourceService(sourceService)
                     .message(message)
                     .payloadTimestamp(payloadTimestamp)
                     .consumedAt(Instant.now())
-                    .status(status)
-                    .errorMessage(errorMessage)
+                    .status("ACKNOWLEDGED")
                     .build();
             kafkaEventLogsRepository.save(logEntry);
         } catch (Exception e) {
-            log.warn("[PLANOGRAM-GROUP] [{}] Failed to persist kafka event log: {}", workerName, e.getMessage());
+            log.warn("[AUDIT-GROUP] Failed to persist kafka event log: {}", e.getMessage());
         }
     }
 
@@ -240,18 +165,11 @@ public class PingEventConsumer {
         Map<String, Object> status = new HashMap<>();
         status.put("groupId", GROUP_ID);
         status.put("consumerClass", getClass().getSimpleName());
-        status.put("pattern", "Load Balancing / Competing Consumers");
         status.put("totalConsumed", totalConsumed.get());
-        status.put("lastWorker", lastWorker.get());
         status.put("lastPartition", lastPartition.get());
         status.put("lastOffset", lastOffset.get());
         status.put("lastReceivedAt", lastReceivedAt.get());
         status.put("lastEvent", lastPingMap.get());
-        status.put("workers", Map.of(
-            "Worker-1", Map.of("processedCount", worker1Count.get(), "partitions", worker1Partitions),
-            "Worker-2", Map.of("processedCount", worker2Count.get(), "partitions", worker2Partitions),
-            "Worker-3", Map.of("processedCount", worker3Count.get(), "partitions", worker3Partitions)
-        ));
         return status;
     }
 }
