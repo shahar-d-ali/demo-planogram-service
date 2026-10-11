@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.demo.planogramservice.events.consumer.AuditPingEventConsumer;
+import com.demo.planogramservice.events.consumer.FraudEventConsumer;
 import com.demo.planogramservice.events.consumer.NotificationPingEventConsumer;
 import com.demo.planogramservice.events.consumer.PingEventConsumer;
 import com.demo.planogramservice.events.domain.KafkaEventLogsRepository;
@@ -28,6 +29,7 @@ public class KafkaTestController {
     private final PingEventConsumer pingEventConsumer;
     private final AuditPingEventConsumer auditPingEventConsumer;
     private final NotificationPingEventConsumer notificationPingEventConsumer;
+    private final FraudEventConsumer fraudEventConsumer;
     private final KafkaEventLogsRepository kafkaEventLogsRepository;
     private final KafkaEventPullService kafkaEventPullService;
 
@@ -35,14 +37,17 @@ public class KafkaTestController {
             PingEventConsumer pingEventConsumer,
             AuditPingEventConsumer auditPingEventConsumer,
             NotificationPingEventConsumer notificationPingEventConsumer,
+            FraudEventConsumer fraudEventConsumer,
             KafkaEventLogsRepository kafkaEventLogsRepository,
             KafkaEventPullService kafkaEventPullService) {
         this.pingEventConsumer = pingEventConsumer;
         this.auditPingEventConsumer = auditPingEventConsumer;
         this.notificationPingEventConsumer = notificationPingEventConsumer;
+        this.fraudEventConsumer = fraudEventConsumer;
         this.kafkaEventLogsRepository = kafkaEventLogsRepository;
         this.kafkaEventPullService = kafkaEventPullService;
     }
+
 
     /**
      * Primary consumer group: planogram-service-group
@@ -137,4 +142,13 @@ public class KafkaTestController {
             @RequestParam(name = "topic", defaultValue = "demo-ping-topic") String topic) {
         return ResponseEntity.ok(kafkaEventPullService.pullExistingEvents(topic));
     }
+
+    /**
+     * Inspect Kafka Streams fraud detection telemetries and detected fraudulent transactions
+     */
+    @GetMapping("/fraud/status")
+    public ResponseEntity<?> getFraudStatus() {
+        return ResponseEntity.ok(fraudEventConsumer.getFraudStatus());
+    }
 }
+
