@@ -18,8 +18,7 @@ import org.springframework.stereotype.Service;
 import com.demo.planogramservice.events.config.KafkaTopicConfig;
 import com.demo.planogramservice.events.domain.KafkaEventLogs;
 import com.demo.planogramservice.events.domain.KafkaEventLogsRepository;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.demo.shared.events.dto.Transaction;
 
 @Service
 public class FraudEventConsumer {
@@ -28,44 +27,45 @@ public class FraudEventConsumer {
     public static final String GROUP_ID = "planogram-fraud-service-group";
 
     private final KafkaEventLogsRepository kafkaEventLogsRepository;
-    private final ObjectMapper objectMapper;
 
     private final AtomicInteger totalFraudDetected = new AtomicInteger(0);
     private final AtomicReference<Map<String, Object>> lastFraudEvent = new AtomicReference<>();
     private final List<Map<String, Object>> recentFraudEvents = Collections.synchronizedList(new ArrayList<>());
 
-    public FraudEventConsumer(KafkaEventLogsRepository kafkaEventLogsRepository, ObjectMapper objectMapper) {
+    public FraudEventConsumer(KafkaEventLogsRepository kafkaEventLogsRepository) {
         this.kafkaEventLogsRepository = kafkaEventLogsRepository;
-        this.objectMapper = objectMapper;
     }
 
-    @KafkaListener(
-            topics = KafkaTopicConfig.FRAUD_DETECTION_TOPIC,
-            groupId = GROUP_ID,
-            properties = {
-                    "key.deserializer=org.apache.kafka.common.serialization.StringDeserializer",
-                    "value.deserializer=org.apache.kafka.common.serialization.StringDeserializer"
-            }
-    )
-    public void onFraudEvent(ConsumerRecord<String, String> record, Acknowledgment ack) {
+    @KafkaListener(topics = KafkaTopicConfig.FRAUD_DETECTION_TOPIC, groupId = GROUP_ID)
+    public void onFraudEvent(ConsumerRecord<String, Object> record, Acknowledgment ack) {
         try {
-            String payload = record.value();
+            Object rawValue = record.value();
             log.warn("ALERT: Fraudulent transaction detected on topic {} [partition={}, offset={}, key={}]: {}",
-                    record.topic(), record.partition(), record.offset(), record.key(), payload);
+                    record.topic(), record.partition(), record.offset(), record.key(), rawValue);
 
             totalFraudDetected.incrementAndGet();
 
             String txId = record.key();
             Double amount = null;
-            try {
-                JsonNode node = objectMapper.readTree(payload);
-                if (node.has("transactionId") && !node.get("transactionId").isNull()) {
-                    txId = node.get("transactionId").asText();
+            String payload;
+
+            if (rawValue instanceof Transaction tx) {
+                txId = tx.getTransactionId() != null ? tx.getTransactionId().toString() : txId;
+                amount = tx.getAmount();
+                payload = tx.toString();
+            } else if (rawValue instanceof org.apache.avro.generic.GenericRecord genericRecord) {
+                if (genericRecord.get("transactionId") != null) {
+                    txId = genericRecord.get("transactionId").toString();
                 }
-                if (node.has("amount") && !node.get("amount").isNull()) {
-                    amount = node.get("amount").asDouble();
+                if (genericRecord.get("amount") != null) {
+                    amount = ((Number) genericRecord.get("amount")).doubleValue();
                 }
-            } catch (Exception ignored) {}
+                payload = genericRecord.toString();
+            } else if (rawValue != null) {
+                payload = rawValue.toString();
+            } else {
+                payload = "{}";
+            }
 
             Map<String, Object> fraudData = Map.of(
                     "transactionId", txId != null ? txId : "unknown",
@@ -73,8 +73,7 @@ public class FraudEventConsumer {
                     "partition", record.partition(),
                     "offset", record.offset(),
                     "detectedAt", Instant.now().toString(),
-                    "payload", payload
-            );
+                    "payload", payload);
 
             lastFraudEvent.set(fraudData);
             if (recentFraudEvents.size() >= 20) {
@@ -112,8 +111,8 @@ public class FraudEventConsumer {
     public Map<String, Object> getFraudStatus() {
         return Map.of(
                 "totalFraudDetected", totalFraudDetected.get(),
-                "lastFraudEvent", lastFraudEvent.get() != null ? lastFraudEvent.get() : Map.of("message", "No fraud events received yet"),
-                "recentFraudEvents", new ArrayList<>(recentFraudEvents)
-        );
+                "lastFraudEvent",
+                lastFraudEvent.get() != null ? lastFraudEvent.get() : Map.of("message", "No fraud events received yet"),
+                "recentFraudEvents", new ArrayList<>(recentFraudEvents));
     }
 }
