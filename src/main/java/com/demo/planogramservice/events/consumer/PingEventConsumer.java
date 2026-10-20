@@ -2,7 +2,6 @@ package com.demo.planogramservice.events.consumer;
 
 import java.time.Instant;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -22,16 +21,19 @@ import com.demo.planogramservice.events.domain.KafkaEventLogsRepository;
 import com.demo.shared.events.dto.PingEvent;
 
 /**
- * Consumer Group: planogram-service-group (Load Balancing / Competing Consumers Pattern)
+ * Consumer Group: planogram-service-group (Load Balancing / Competing Consumers
+ * Pattern)
  * 
  * Demonstrates MULTIPLE CONSUMERS INSIDE A SINGLE CONSUMER GROUP:
  * 
  * All workers share the same 'groupId' ("planogram-service-group").
  * In Apache Kafka, when multiple consumers share the same groupId:
- * 1. They DO NOT duplicate messages. Instead, they divide the topic's partitions among themselves.
+ * 1. They DO NOT duplicate messages. Instead, they divide the topic's
+ * partitions among themselves.
  * 2. Topic 'demo-ping-topic' has 5 partitions (0, 1, 2, 3, 4).
  * 3. Kafka assigns a subset of partitions to Worker-1, Worker-2, and Worker-3.
- * 4. Each published event is processed by EXACTLY ONE worker inside this group (load-balanced).
+ * 4. Each published event is processed by EXACTLY ONE worker inside this group
+ * (load-balanced).
  */
 @Service
 public class PingEventConsumer {
@@ -68,12 +70,7 @@ public class PingEventConsumer {
     /**
      * Consumer Instance 1 (Worker 1 in planogram-service-group)
      */
-    @KafkaListener(
-        id = "planogram-consumer-worker-1",
-        topics = "demo-ping-topic",
-        groupId = GROUP_ID,
-        clientIdPrefix = "planogram-worker-1"
-    )
+    @KafkaListener(id = "planogram-consumer-worker-1", topics = "demo-ping-topic", groupId = GROUP_ID, clientIdPrefix = "planogram-worker-1")
     public void consumeWorker1(ConsumerRecord<String, Object> record, Acknowledgment acknowledgment) {
         worker1Count.incrementAndGet();
         worker1Partitions.add(record.partition());
@@ -83,12 +80,7 @@ public class PingEventConsumer {
     /**
      * Consumer Instance 2 (Worker 2 in planogram-service-group)
      */
-    @KafkaListener(
-        id = "planogram-consumer-worker-2",
-        topics = "demo-ping-topic",
-        groupId = GROUP_ID,
-        clientIdPrefix = "planogram-worker-2"
-    )
+    @KafkaListener(id = "planogram-consumer-worker-2", topics = "demo-ping-topic", groupId = GROUP_ID, clientIdPrefix = "planogram-worker-2")
     public void consumeWorker2(ConsumerRecord<String, Object> record, Acknowledgment acknowledgment) {
         worker2Count.incrementAndGet();
         worker2Partitions.add(record.partition());
@@ -98,12 +90,7 @@ public class PingEventConsumer {
     /**
      * Consumer Instance 3 (Worker 3 in planogram-service-group)
      */
-    @KafkaListener(
-        id = "planogram-consumer-worker-3",
-        topics = "demo-ping-topic",
-        groupId = GROUP_ID,
-        clientIdPrefix = "planogram-worker-3"
-    )
+    @KafkaListener(id = "planogram-consumer-worker-3", topics = "demo-ping-topic", groupId = GROUP_ID, clientIdPrefix = "planogram-worker-3")
     public void consumeWorker3(ConsumerRecord<String, Object> record, Acknowledgment acknowledgment) {
         worker3Count.incrementAndGet();
         worker3Partitions.add(record.partition());
@@ -113,7 +100,8 @@ public class PingEventConsumer {
     /**
      * Common processing logic for all workers in this consumer group
      */
-    private void processRecord(String workerName, ConsumerRecord<String, Object> record, Acknowledgment acknowledgment) {
+    private void processRecord(String workerName, ConsumerRecord<String, Object> record,
+            Acknowledgment acknowledgment) {
         Object value = record.value();
         int partition = record.partition();
         long offset = record.offset();
@@ -180,7 +168,8 @@ public class PingEventConsumer {
                     acknowledgment.acknowledge();
                 }
             } catch (Exception e) {
-                log.warn("[PLANOGRAM-GROUP] [{}] Could not extract ping event fields via reflection: {}", workerName, e.getMessage());
+                log.warn("[PLANOGRAM-GROUP] [{}] Could not extract ping event fields via reflection: {}", workerName,
+                        e.getMessage());
             }
         }
 
@@ -196,7 +185,8 @@ public class PingEventConsumer {
             Long payloadTimestamp,
             String status,
             String errorMessage) {
-        if (kafkaEventLogsRepository == null) return;
+        if (kafkaEventLogsRepository == null)
+            return;
         try {
             KafkaEventLogs logEntry = KafkaEventLogs.builder()
                     .topic(record.topic())
@@ -205,7 +195,9 @@ public class PingEventConsumer {
                     .eventKey(record.key() != null ? record.key().toString() : null)
                     .recordTimestamp(record.timestamp())
                     .timestampType(record.timestampType() != null ? record.timestampType().name() : null)
-                    .leaderEpoch(record.leaderEpoch() != null && record.leaderEpoch().isPresent() ? record.leaderEpoch().get() : null)
+                    .leaderEpoch(record.leaderEpoch() != null && record.leaderEpoch().isPresent()
+                            ? record.leaderEpoch().get()
+                            : null)
                     .consumerGroupId(GROUP_ID)
                     .workerName(workerName)
                     .consumerClientId("planogram-" + workerName.toLowerCase())
@@ -248,10 +240,9 @@ public class PingEventConsumer {
         status.put("lastReceivedAt", lastReceivedAt.get());
         status.put("lastEvent", lastPingMap.get());
         status.put("workers", Map.of(
-            "Worker-1", Map.of("processedCount", worker1Count.get(), "partitions", worker1Partitions),
-            "Worker-2", Map.of("processedCount", worker2Count.get(), "partitions", worker2Partitions),
-            "Worker-3", Map.of("processedCount", worker3Count.get(), "partitions", worker3Partitions)
-        ));
+                "Worker-1", Map.of("processedCount", worker1Count.get(), "partitions", worker1Partitions),
+                "Worker-2", Map.of("processedCount", worker2Count.get(), "partitions", worker2Partitions),
+                "Worker-3", Map.of("processedCount", worker3Count.get(), "partitions", worker3Partitions)));
         return status;
     }
 }
