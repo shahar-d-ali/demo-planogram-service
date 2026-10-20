@@ -37,39 +37,18 @@ public class FraudEventConsumer {
     }
 
     @KafkaListener(topics = KafkaTopicConfig.FRAUD_DETECTION_TOPIC, groupId = GROUP_ID)
-    public void onFraudEvent(ConsumerRecord<String, Object> record, Acknowledgment ack) {
+    public void onFraudEvent(ConsumerRecord<String, Transaction> record, Acknowledgment ack) {
         try {
-            Object rawValue = record.value();
-            log.warn("ALERT: Fraudulent transaction detected on topic {} [partition={}, offset={}, key={}]: {}",
-                    record.topic(), record.partition(), record.offset(), record.key(), rawValue);
+            Transaction tx = record.value();
+            String txId = tx != null && tx.getTransactionId() != null ? tx.getTransactionId().toString() : record.key();
+            Double amount = tx != null ? tx.getAmount() : 0.0;
+            String payload = tx != null ? tx.toString() : "{}";
 
             totalFraudDetected.incrementAndGet();
 
-            String txId = record.key();
-            Double amount = null;
-            String payload;
-
-            if (rawValue instanceof Transaction tx) {
-                txId = tx.getTransactionId() != null ? tx.getTransactionId().toString() : txId;
-                amount = tx.getAmount();
-                payload = tx.toString();
-            } else if (rawValue instanceof org.apache.avro.generic.GenericRecord genericRecord) {
-                if (genericRecord.get("transactionId") != null) {
-                    txId = genericRecord.get("transactionId").toString();
-                }
-                if (genericRecord.get("amount") != null) {
-                    amount = ((Number) genericRecord.get("amount")).doubleValue();
-                }
-                payload = genericRecord.toString();
-            } else if (rawValue != null) {
-                payload = rawValue.toString();
-            } else {
-                payload = "{}";
-            }
-
             Map<String, Object> fraudData = Map.of(
                     "transactionId", txId != null ? txId : "unknown",
-                    "amount", amount != null ? amount : 0.0,
+                    "amount", amount,
                     "partition", record.partition(),
                     "offset", record.offset(),
                     "detectedAt", Instant.now().toString(),
@@ -100,7 +79,7 @@ public class FraudEventConsumer {
 
             kafkaEventLogsRepository.save(logEntry);
         } catch (Exception e) {
-            log.error("Error processing fraud event record: {}", record, e);
+            log.error("Error processing fraud event: {}", e.getMessage(), e);
         } finally {
             if (ack != null) {
                 ack.acknowledge();

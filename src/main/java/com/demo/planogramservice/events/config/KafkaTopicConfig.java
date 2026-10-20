@@ -27,4 +27,16 @@ public class KafkaTopicConfig {
                 .replicas(1)
                 .build();
     }
+
+    // New Topic For Account per count
+    public static final String ACCOUNT_COUNT_TOPIC = "account-count-topic";
+
+    @Bean
+    public NewTopic accountCountTopic() {
+        return TopicBuilder.name(ACCOUNT_COUNT_TOPIC)
+                .partitions(1)
+                .replicas(1)
+                .build();
+    }
+
 }
